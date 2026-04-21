@@ -13,6 +13,13 @@ return new class extends Migration
     {
         Schema::create('reports', function (Blueprint $table) {
             $table->id();
+            $table->foreignId('product_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('user_id')->nullable()->constrained()->nullOnDelete(); // кој го генерирал
+            $table->enum('status', ['draft', 'pending_review', 'published'])->default('draft');
+            $table->string('title');
+            $table->date('period_from');
+            $table->date('period_to');
+            $table->timestamp('published_at')->nullable();
             $table->timestamps();
         });
     }

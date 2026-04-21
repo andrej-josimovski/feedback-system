@@ -13,6 +13,13 @@ return new class extends Migration
     {
         Schema::create('report_sections', function (Blueprint $table) {
             $table->id();
+            $table->foreignId('report_id')->constrained()->cascadeOnDelete();
+            $table->string('theme');
+            $table->json('issues')->nullable();      // ["проблем1", "проблем2"]
+            $table->json('proposals')->nullable();   // ["предлог1", "предлог2"]
+            $table->text('ai_summary')->nullable();
+            $table->text('admin_summary')->nullable();
+            $table->integer('order')->default(0);
             $table->timestamps();
         });
     }
