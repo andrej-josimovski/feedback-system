@@ -8,6 +8,30 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Report extends Model
 {
+    /** @var list<string> */
+    protected $fillable = [
+        'product_id',
+        'user_id',
+        'status',
+        'title',
+        'period_from',
+        'period_to',
+        'published_by',
+        'published_at',
+    ];
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'period_from' => 'date',
+            'period_to' => 'date',
+            'published_at' => 'datetime',
+        ];
+    }
+
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);

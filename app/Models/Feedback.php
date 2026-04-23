@@ -7,6 +7,24 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Feedback extends Model
 {
+	/** @var list<string> */
+	protected $fillable = [
+		'product_id',
+		'user_id',
+		'rating',
+		'comment',
+	];
+
+	/**
+	 * @return array<string, string>
+	 */
+	protected function casts(): array
+	{
+		return [
+			'rating' => 'integer',
+		];
+	}
+
 	public function product(): BelongsTo
 	{
 		return $this->belongsTo(Product::class);
