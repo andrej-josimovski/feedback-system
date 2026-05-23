@@ -18,7 +18,7 @@ return new class extends Migration
             $table->foreignId('team_id')->nullable();
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
-            $table->enum('role', ['admin', 'user'])->default('user');
+            $table->enum('role', ['admin', 'member'])->default('member');
             $table->rememberToken();
             $table->timestamps();
         });

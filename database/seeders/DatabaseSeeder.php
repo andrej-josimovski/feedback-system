@@ -68,13 +68,38 @@ class DatabaseSeeder extends Seeder
                     'team_id' => $teamId,
                     'email_verified_at' => $now,
                     'password' => Hash::make('password'),
-                    'role' => 'user',
+                    'role' => 'member',
                     'remember_token' => Str::random(10),
                     'created_at' => $now,
                     'updated_at' => $now,
                 ]);
             }
         }
+
+        // Add standalone members (not assigned to a team)
+        $standaloneMemberId1 = DB::table('users')->insertGetId([
+            'name' => 'John Member',
+            'email' => 'john@feedback.local',
+            'team_id' => null,
+            'email_verified_at' => $now,
+            'password' => Hash::make('password'),
+            'role' => 'member',
+            'remember_token' => Str::random(10),
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        $standaloneMemberId2 = DB::table('users')->insertGetId([
+            'name' => 'Jane Member',
+            'email' => 'jane@feedback.local',
+            'team_id' => null,
+            'email_verified_at' => $now,
+            'password' => Hash::make('password'),
+            'role' => 'member',
+            'remember_token' => Str::random(10),
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
 
         // Products
         $products = [

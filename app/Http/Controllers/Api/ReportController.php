@@ -6,67 +6,47 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreReportRequest;
 use App\Models\Report;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class ReportController extends Controller
 {
-    public function index(): JsonResponse
-    {
-        $reports = Report::query()
-            ->with([
-                'product:id,name,slug,team_id',
-                'product.team:id,name,slug',
-                'publisher:id,name,email',
-            ])
-            ->withCount('sections')
-            ->orderByDesc('created_at')
-            ->get();
+    // ...existing code...
 
-        return response()->json($reports);
-    }
-
-    public function show(Report $report): JsonResponse
+    public function update(Request $request, Report $report): JsonResponse
     {
-        $report->load([
-            'product:id,name,slug,team_id',
-            'product.team:id,name,slug',
-            'user:id,name,email',
-            'publisher:id,name,email',
-            'sections' => fn ($query) => $query->orderBy('order'),
+        $this->authorize('update', $report);
+
+        $validated = $request->validate([
+            'title' => 'sometimes|string|max:255',
+            'period_from' => 'sometimes|date',
+            'period_to' => 'sometimes|date|after:period_from',
         ]);
+
+        $report->update($validated);
 
         return response()->json($report);
     }
 
-    public function store(StoreReportRequest $request): JsonResponse
+    public function publish(Request $request, Report $report): JsonResponse
     {
-        $report = new Report();
-        $report->product_id = (int) $request->validated('product_id');
-        $report->user_id = $request->validated('user_id');
-        $report->title = $request->validated('title');
-        $report->period_from = $request->validated('period_from');
-        $report->period_to = $request->validated('period_to');
-        // status is set by ReportObserver to 'pending_review'
-        $report->save();
+        $this->authorize('publish', $report);
 
-        $report->load([
-            'product:id,name,slug',
-            'user:id,name,email',
+        if ($report->status !== 'pending_review') {
+            return response()->json([
+                'message' => 'Only reports in pending_review status can be published.',
+                'current_status' => $report->status,
+            ], 422);
+        }
+
+        $report->update([
+            'status' => 'published',
+            'published_at' => now(),
+            'published_by' => $request->user()->id,
         ]);
 
-        return response()->json($report, 201);
-    }
-
-    public function sections(Report $report): JsonResponse
-    {
-        $sections = $report->sections()->orderBy('order')->get();
-
         return response()->json([
-            'report' => [
-                'id' => $report->id,
-                'title' => $report->title,
-                'status' => $report->status,
-            ],
-            'sections' => $sections,
+            'message' => 'Report published successfully.',
+            'report' => $report,
         ]);
     }
 }
