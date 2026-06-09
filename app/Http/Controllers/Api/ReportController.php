@@ -10,7 +10,49 @@ use Illuminate\Http\Request;
 
 class ReportController extends Controller
 {
-    // ...existing code...
+    public function index(Request $request): JsonResponse
+    {
+        $this->authorize('viewAny', Report::class);
+
+        $reports = Report::query()
+            ->with(['product', 'user', 'publisher'])
+            ->latest('id')
+            ->get();
+
+        return response()->json($reports);
+    }
+
+    public function store(StoreReportRequest $request): JsonResponse
+    {
+        $this->authorize('create', Report::class);
+
+        $validated = $request->validated();
+
+        $report = Report::create([
+            'product_id' => $validated['product_id'],
+            'user_id' => $validated['user_id'] ?? $request->user()->id,
+            'title' => $validated['title'],
+            'period_from' => $validated['period_from'],
+            'period_to' => $validated['period_to'],
+            'status' => 'draft',
+        ]);
+
+        return response()->json($report->load(['product', 'user']), 201);
+    }
+
+    public function show(Report $report): JsonResponse
+    {
+        $this->authorize('view', $report);
+
+        return response()->json($report->load(['product', 'user', 'publisher', 'sections']));
+    }
+
+    public function sections(Report $report): JsonResponse
+    {
+        $this->authorize('view', $report);
+
+        return response()->json($report->sections()->orderBy('order')->get());
+    }
 
     public function update(Request $request, Report $report): JsonResponse
     {

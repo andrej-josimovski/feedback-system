@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\FeedbackController;
 use App\Http\Controllers\Api\ReportController;
+use App\Http\Controllers\Api\ReportAnalysisController;
 use App\Http\Controllers\Api\AuthController;
 use Illuminate\Support\Facades\Route;
 
@@ -42,5 +43,7 @@ Route::middleware(['auth:sanctum'])->group(function (): void {
         Route::get('{report}/sections', [ReportController::class, 'sections']);
         Route::patch('{report}', [ReportController::class, 'update']);
         Route::patch('{report}/publish', [ReportController::class, 'publish']);
+        Route::post('{report}/analyze', [ReportAnalysisController::class, 'analyze']);
+        Route::get('{report}/analysis-status', [ReportAnalysisController::class, 'status']);
     });
 });

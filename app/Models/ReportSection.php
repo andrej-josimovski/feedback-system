@@ -7,6 +7,17 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ReportSection extends Model
 {
+    /** @var list<string> */
+    protected $fillable = [
+        'report_id',
+        'theme',
+        'issues',
+        'proposals',
+        'ai_summary',
+        'admin_summary',
+        'order',
+    ];
+
     /**
      * @return array<string, string>
      */

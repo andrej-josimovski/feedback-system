@@ -59,25 +59,44 @@ class AnalyzeFeedbackJob implements ShouldQueue
         try {
             // Fetch feedbacks for this report's product (or provided ids)
             if (!empty($this->options['feedback_ids']) && is_array($this->options['feedback_ids'])) {
-                $feedbacks = Feedback::whereIn('id', $this->options['feedback_ids'])->get();
+                $feedbacks = Feedback::where('product_id', $report->product_id)
+                    ->whereIn('id', $this->options['feedback_ids'])
+                    ->get();
             } else {
-                $feedbacks = Feedback::where('product_id', $report->product_id)->get();
+                $feedbacks = Feedback::where('product_id', $report->product_id)
+                    ->whereBetween('created_at', [
+                        $report->period_from->startOfDay(),
+                        $report->period_to->endOfDay(),
+                    ])
+                    ->get();
             }
 
-            $comments = $feedbacks->mapWithKeys(function ($f) {
-                return [$f->id => trim($f->comment)];
-            })->filter()->toArray();
+            $feedbackItems = $feedbacks
+                ->filter(fn (Feedback $feedback): bool => filled($feedback->comment))
+                ->mapWithKeys(function (Feedback $feedback): array {
+                    return [
+                        $feedback->id => [
+                            'rating' => $feedback->rating,
+                            'comment' => trim((string) $feedback->comment),
+                        ],
+                    ];
+                })
+                ->toArray();
 
-            if (empty($comments)) {
+            if (empty($feedbackItems)) {
                 $report->ai_status = 'completed';
-                $report->ai_analysis = ['clusters' => [], 'meta' => ['note' => 'no_feedbacks']];
+                $report->ai_analysis = [
+                    'summary_message' => 'No written feedback was submitted for this product during the report period.',
+                    'clusters' => [],
+                    'meta' => ['note' => 'no_feedbacks'],
+                ];
                 $report->ai_completed_at = now();
                 $report->save();
                 return;
             }
 
             $batchSize = (int)($this->options['batch_size'] ?? 25);
-            $batches = array_chunk($comments, $batchSize, true);
+            $batches = array_chunk($feedbackItems, $batchSize, true);
 
             $allClusters = [];
             $batchIndex = 0;
@@ -99,13 +118,23 @@ class AnalyzeFeedbackJob implements ShouldQueue
 
             // Optional: a simple merge step to deduplicate cluster themes by title
             $merged = $this->mergeClusters($allClusters);
+            $summaryMessage = $this->buildReportSummaryMessage($feedbacks->all(), $merged);
 
             // Store as report_sections and ai_analysis
             $this->storeAnalysisIntoReport($report, $merged);
 
             $report->ai_status = 'completed';
             $report->ai_completed_at = now();
-            $report->ai_analysis = ['clusters' => $merged, 'meta' => ['model' => $report->ai_model, 'provider' => config('services.openrouter.base_uri')]];
+            $report->ai_analysis = [
+                'summary_message' => $summaryMessage,
+                'feedback_count' => $feedbacks->count(),
+                'average_rating' => round((float) $feedbacks->avg('rating'), 2),
+                'clusters' => $merged,
+                'meta' => [
+                    'model' => $report->ai_model,
+                    'provider' => config('services.openrouter.base_uri'),
+                ],
+            ];
             $report->save();
 
         } catch (Exception $e) {
@@ -123,11 +152,15 @@ class AnalyzeFeedbackJob implements ShouldQueue
     {
         // Build a clear instruction and include the batch as JSON
         $items = [];
-        foreach ($batch as $id => $text) {
-            $items[] = ['id' => (int)$id, 'text' => $text];
+        foreach ($batch as $id => $feedback) {
+            $items[] = [
+                'id' => (int)$id,
+                'rating' => (int) $feedback['rating'],
+                'comment' => $feedback['comment'],
+            ];
         }
 
-        $instruction = "You are an assistant. Given an array of user feedback comments, group them into clusters by topic and return strictly valid JSON with the following schema:\n{\n  \"clusters\": [\n    {\n      \"cluster_id\": \"string\",\n      \"theme\": \"short theme title\",\n      \"members\": [list of feedback ids],\n      \"combined_text\": \"concatenated comments for the cluster\"\n    }\n  ]\n}\nDo not include any text outside the JSON object. Keep themes short (3-6 words).";
+        $instruction = "You are an assistant. Given an array of product feedback items with ratings and comments, group them into clusters by topic and summarize each cluster for a product report. Return strictly valid JSON with the following schema:\n{\n  \"clusters\": [\n    {\n      \"cluster_id\": \"string\",\n      \"theme\": \"short theme title\",\n      \"members\": [list of feedback ids],\n      \"ai_summary\": \"2-4 sentence report-ready summary of what customers said, including rating context\",\n      \"issues\": [\"short issue or pain point\"],\n      \"proposals\": [\"short improvement proposal\"],\n      \"combined_text\": \"brief evidence notes from comments, not every full comment\"\n    }\n  ]\n}\nDo not include any text outside the JSON object. Keep themes short (3-6 words). Keep summaries factual and do not invent details.";
 
         $payload = [
             'instruction' => $instruction,
@@ -146,7 +179,7 @@ class AnalyzeFeedbackJob implements ShouldQueue
         $apiKey = config('services.openrouter.key');
         $model = $payload['model'] ?? config('services.openrouter.model');
 
-        $system = "You are a JSON-only assistant specialized in clustering short feedback comments. Only output valid JSON as requested.";
+        $system = "You are a JSON-only assistant specialized in summarizing product feedback comments and ratings for business reports. Only output valid JSON as requested.";
 
         $messages = [
             ['role' => 'system', 'content' => $system],
@@ -253,23 +286,52 @@ class AnalyzeFeedbackJob implements ShouldQueue
                     $map[$theme]['cluster_id'] = 'c_' . Str::random(8);
                 }
             } else {
-                // merge members and combined_text
+                // merge members and narrative fields
                 $map[$theme]['members'] = array_values(array_unique(array_merge($map[$theme]['members'] ?? [], $c['members'] ?? [])));
                 $map[$theme]['combined_text'] = trim(($map[$theme]['combined_text'] ?? '') . "\n" . ($c['combined_text'] ?? ''));
+                $map[$theme]['ai_summary'] = trim(($map[$theme]['ai_summary'] ?? '') . "\n" . ($c['ai_summary'] ?? ''));
+                $map[$theme]['issues'] = array_values(array_unique(array_merge($map[$theme]['issues'] ?? [], $c['issues'] ?? [])));
+                $map[$theme]['proposals'] = array_values(array_unique(array_merge($map[$theme]['proposals'] ?? [], $c['proposals'] ?? [])));
             }
         }
 
         return array_values($map);
     }
 
+    /**
+     * @param list<Feedback> $feedbacks
+     */
+    protected function buildReportSummaryMessage(array $feedbacks, array $clusters): string
+    {
+        $feedbackCount = count($feedbacks);
+        $averageRating = $feedbackCount > 0
+            ? round(array_sum(array_map(fn (Feedback $feedback): int => $feedback->rating, $feedbacks)) / $feedbackCount, 2)
+            : 0;
+
+        $themes = collect($clusters)
+            ->take(3)
+            ->map(fn (array $cluster): string => $cluster['theme'] ?? 'General feedback')
+            ->implode(', ');
+
+        $message = "This report summarizes {$feedbackCount} feedback message";
+        $message .= $feedbackCount === 1 ? '' : 's';
+        $message .= " with an average rating of {$averageRating}/5.";
+
+        if ($themes !== '') {
+            $message .= " The main themes are {$themes}.";
+        }
+
+        return $message;
+    }
+
     protected function storeAnalysisIntoReport(Report $report, array $clusters): void
     {
         // For each cluster, create or update a ReportSection with ai_summary placeholder
         foreach ($clusters as $idx => $cluster) {
-            $title = $cluster['theme'] ?? ('Cluster ' . ($idx + 1));
-            $section = $report->sections()->firstOrNew(['title' => $title]);
+            $theme = $cluster['theme'] ?? ('Cluster ' . ($idx + 1));
+            $section = $report->sections()->firstOrNew(['theme' => $theme]);
             $section->order = $section->order ?? ($idx + 1);
-            $section->ai_summary = substr($cluster['combined_text'] ?? '', 0, 2000);
+            $section->ai_summary = substr($cluster['ai_summary'] ?? $cluster['combined_text'] ?? '', 0, 2000);
             $section->issues = $cluster['issues'] ?? [];
             $section->proposals = $cluster['proposals'] ?? [];
             $section->save();
@@ -296,4 +358,3 @@ class AnalyzeFeedbackJob implements ShouldQueue
         Log::error('AnalyzeFeedbackJob final failure', ['report_id' => $this->reportId, 'error' => $exception->getMessage()]);
     }
 }
-
