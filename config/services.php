@@ -35,4 +35,13 @@ return [
         ],
     ],
 
+    // OpenRouter / OpenAI connector
+    'openrouter' => [
+        'key' => env('OPENROUTER_API_KEY'),
+        'base_uri' => env('OPENROUTER_BASE_URI', 'https://api.openrouter.ai'),
+        'provider' => env('OPENROUTER_PROVIDER', null), // optional provider identifier
+        'model' => env('AI_MODEL', 'gpt-4o-mini'),
+        'timeout' => env('OPENROUTER_TIMEOUT', 60),
+    ],
+
 ];

@@ -14,22 +14,21 @@ try {
     $feedback = DB::table('feedback')->count();
 
     echo "✅ PostgreSQL Connection Successful!\n\n";
-    echo "📊 Database Stats:\n";
+    echo " Database Stats:\n";
     echo "   Users: $users\n";
     echo "   Reports: $reports\n";
     echo "   Feedback: $feedback\n";
 
     $admin = DB::table('users')->where('role', 'admin')->first();
-    echo "\n👤 Admin User:\n";
+    echo "\n Admin User:\n";
     echo "   Email: {$admin->email}\n";
     echo "   Password: password\n";
 
     $member = DB::table('users')->where('role', 'member')->first();
-    echo "\n👥 Member User:\n";
+    echo "\n Member User:\n";
     echo "   Email: {$member->email}\n";
     echo "   Password: password\n";
 
 } catch (Exception $e) {
     echo "❌ Connection failed: " . $e->getMessage() . "\n";
 }
-

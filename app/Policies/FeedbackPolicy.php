@@ -47,4 +47,3 @@ class FeedbackPolicy
         return $user->isAdmin() || ($user->id === $feedback->user_id && $feedback->created_at->diffInMinutes() < 15);
     }
 }
-

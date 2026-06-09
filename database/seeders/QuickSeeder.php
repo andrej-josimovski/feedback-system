@@ -105,4 +105,3 @@ class QuickSeeder extends Seeder
         ]);
     }
 }
-

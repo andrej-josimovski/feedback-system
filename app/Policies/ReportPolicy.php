@@ -55,4 +55,3 @@ class ReportPolicy
         return $user->isAdmin() && $report->status === 'pending_review';
     }
 }
-
