@@ -31,6 +31,9 @@ Route::middleware(['auth:sanctum'])->group(function (): void {
 
     // Product feedback routes
     Route::prefix('products')->group(function (): void {
+        Route::post('/', [ProductController::class, 'store'])->middleware('admin');
+        Route::patch('{product}', [ProductController::class, 'update'])->middleware('admin');
+        Route::delete('{product}', [ProductController::class, 'destroy'])->middleware('admin');
         Route::get('{product}/feedback', [FeedbackController::class, 'indexForProduct'])->middleware('admin'); // Admin only
         Route::post('{product}/feedback', [FeedbackController::class, 'storeForProduct']); // All authenticated users
     });

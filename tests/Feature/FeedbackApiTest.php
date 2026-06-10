@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 class FeedbackApiTest extends TestCase
@@ -13,11 +14,12 @@ class FeedbackApiTest extends TestCase
 
     public function test_it_creates_feedback_via_global_endpoint(): void
     {
-        [$productId, $userId] = $this->createProductAndUser();
+        [$productId, $user] = $this->createProductAndUser();
+
+        Sanctum::actingAs($user);
 
         $response = $this->postJson('/api/feedback', [
             'product_id' => $productId,
-            'user_id' => $userId,
             'rating' => 5,
             'comment' => 'Great feature set and very easy to use.',
         ]);
@@ -26,21 +28,22 @@ class FeedbackApiTest extends TestCase
             ->assertCreated()
             ->assertJsonPath('product_id', $productId)
             ->assertJsonPath('rating', 5)
-            ->assertJsonPath('user.id', $userId);
+            ->assertJsonPath('user.id', $user->id);
 
         $this->assertDatabaseHas('feedback', [
             'product_id' => $productId,
-            'user_id' => $userId,
+            'user_id' => $user->id,
             'rating' => 5,
         ]);
     }
 
     public function test_it_creates_feedback_via_nested_product_endpoint(): void
     {
-        [$productId, $userId] = $this->createProductAndUser();
+        [$productId, $user] = $this->createProductAndUser();
+
+        Sanctum::actingAs($user);
 
         $response = $this->postJson("/api/products/{$productId}/feedback", [
-            'user_id' => $userId,
             'rating' => 2,
             'comment' => 'Notification delay is still noticeable.',
         ]);
@@ -49,22 +52,23 @@ class FeedbackApiTest extends TestCase
             ->assertCreated()
             ->assertJsonPath('product.id', $productId)
             ->assertJsonPath('feedback.rating', 2)
-            ->assertJsonPath('feedback.user.id', $userId);
+            ->assertJsonPath('feedback.user.id', $user->id);
 
         $this->assertDatabaseHas('feedback', [
             'product_id' => $productId,
-            'user_id' => $userId,
+            'user_id' => $user->id,
             'rating' => 2,
         ]);
     }
 
     public function test_it_validates_feedback_rating_and_nested_product_payload(): void
     {
-        [$productId, $userId] = $this->createProductAndUser();
+        [$productId, $user] = $this->createProductAndUser();
+
+        Sanctum::actingAs($user);
 
         $invalidRating = $this->postJson('/api/feedback', [
             'product_id' => $productId,
-            'user_id' => $userId,
             'rating' => 7,
         ]);
 
@@ -79,7 +83,7 @@ class FeedbackApiTest extends TestCase
     }
 
     /**
-     * @return array{int, int}
+     * @return array{int, User}
      */
     private function createProductAndUser(): array
     {
@@ -100,11 +104,10 @@ class FeedbackApiTest extends TestCase
             'updated_at' => now(),
         ]);
 
-        $userId = User::factory()->create([
+        $user = User::factory()->create([
             'team_id' => $teamId,
-        ])->id;
+        ]);
 
-        return [$productId, $userId];
+        return [$productId, $user];
     }
 }
-

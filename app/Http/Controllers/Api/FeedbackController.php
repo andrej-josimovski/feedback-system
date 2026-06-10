@@ -38,7 +38,7 @@ class FeedbackController extends Controller
     {
         $feedback = new Feedback();
         $feedback->product_id = (int) $request->validated('product_id');
-        $feedback->user_id = $request->validated('user_id');
+        $feedback->user_id = $request->user()?->id;
         $feedback->rating = (int) $request->validated('rating');
         $feedback->comment = $request->validated('comment');
         $feedback->save();
@@ -73,7 +73,7 @@ class FeedbackController extends Controller
     {
         $feedback = new Feedback();
         $feedback->product_id = $product->id;
-        $feedback->user_id = $request->validated('user_id');
+        $feedback->user_id = $request->user()?->id;
         $feedback->rating = (int) $request->validated('rating');
         $feedback->comment = $request->validated('comment');
         $feedback->save();
@@ -90,4 +90,3 @@ class FeedbackController extends Controller
         ], 201);
     }
 }
-

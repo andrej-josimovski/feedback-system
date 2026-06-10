@@ -7,6 +7,7 @@ use App\Models\Report;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 class ReportObserverTest extends TestCase
@@ -15,11 +16,12 @@ class ReportObserverTest extends TestCase
 
     public function test_report_gets_pending_review_status_on_creation(): void
     {
-        [$productId, $userId] = $this->createProductAndUser();
+        [$productId, $user] = $this->createProductAndUser();
+
+        Sanctum::actingAs($user);
 
         $response = $this->postJson('/api/reports', [
             'product_id' => $productId,
-            'user_id' => $userId,
             'title' => 'New Report Q2 2026',
             'period_from' => '2026-04-01',
             'period_to' => '2026-04-30',
@@ -39,6 +41,12 @@ class ReportObserverTest extends TestCase
 
     public function test_report_validates_input(): void
     {
+        $user = User::factory()->create([
+            'role' => 'admin',
+        ]);
+
+        Sanctum::actingAs($user);
+
         $invalidDates = $this->postJson('/api/reports', [
             'product_id' => 999,
             'title' => 'Test',
@@ -50,7 +58,7 @@ class ReportObserverTest extends TestCase
     }
 
     /**
-     * @return array{int, int}
+     * @return array{int, User}
      */
     private function createProductAndUser(): array
     {
@@ -71,11 +79,11 @@ class ReportObserverTest extends TestCase
             'updated_at' => now(),
         ]);
 
-        $userId = User::factory()->create([
+        $user = User::factory()->create([
             'team_id' => $teamId,
-        ])->id;
+            'role' => 'admin',
+        ]);
 
-        return [$productId, $userId];
+        return [$productId, $user];
     }
 }
-

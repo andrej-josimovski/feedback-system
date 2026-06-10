@@ -18,10 +18,9 @@ class StoreFeedbackRequest extends FormRequest
     {
         return [
             'product_id' => ['required', 'integer', 'exists:products,id'],
-            'user_id' => ['nullable', 'integer', 'exists:users,id'],
+            'user_id' => ['prohibited'],
             'rating' => ['required', 'integer', 'between:1,5'],
             'comment' => ['nullable', 'string', 'max:5000'],
         ];
     }
 }
-

@@ -34,7 +34,6 @@ class ReportController extends Controller
             'title' => $validated['title'],
             'period_from' => $validated['period_from'],
             'period_to' => $validated['period_to'],
-            'status' => 'draft',
         ]);
 
         return response()->json($report->load(['product', 'user']), 201);

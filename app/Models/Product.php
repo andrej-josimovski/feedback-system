@@ -8,6 +8,14 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Product extends Model
 {
+    /** @var list<string> */
+    protected $fillable = [
+        'team_id',
+        'name',
+        'slug',
+        'description',
+    ];
+
     public function team(): BelongsTo
     {
         return $this->belongsTo(Team::class);

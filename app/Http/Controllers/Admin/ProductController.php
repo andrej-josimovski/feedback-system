@@ -1,49 +1,49 @@
 <?php
 
-namespace App\Http\Controllers\Api;
+namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreProductRequest;
 use App\Http\Requests\UpdateProductRequest;
 use App\Models\Product;
-use Illuminate\Http\JsonResponse;
+use App\Models\Team;
+use Illuminate\Contracts\View\View;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Str;
 
 class ProductController extends Controller
 {
-    public function index(): JsonResponse
+    public function index(): View
     {
         $products = Product::query()
-            ->with('team:id,name,slug')
+            ->with('team:id,name')
             ->withCount('feedbacks')
             ->orderBy('name')
             ->get();
 
-        return response()->json($products);
+        return view('admin.products.index', [
+            'products' => $products,
+            'teams' => Team::query()->orderBy('name')->get(['id', 'name']),
+        ]);
     }
 
-    public function show(Product $product): JsonResponse
-    {
-        $product->load('team:id,name,slug');
-
-        return response()->json($product);
-    }
-
-    public function store(StoreProductRequest $request): JsonResponse
+    public function store(StoreProductRequest $request): RedirectResponse
     {
         $validated = $request->validated();
 
-        $product = Product::create([
+        Product::create([
             'team_id' => $validated['team_id'],
             'name' => $validated['name'],
             'slug' => $this->slugFromInput($validated),
             'description' => $validated['description'] ?? null,
         ]);
 
-        return response()->json($product->load('team:id,name,slug'), 201);
+        return redirect()
+            ->route('admin.products.index')
+            ->with('status', 'Product added.');
     }
 
-    public function update(UpdateProductRequest $request, Product $product): JsonResponse
+    public function update(UpdateProductRequest $request, Product $product): RedirectResponse
     {
         $validated = $request->validated();
 
@@ -54,14 +54,18 @@ class ProductController extends Controller
             'description' => $validated['description'] ?? null,
         ]);
 
-        return response()->json($product->load('team:id,name,slug'));
+        return redirect()
+            ->route('admin.products.index')
+            ->with('status', 'Product updated.');
     }
 
-    public function destroy(Product $product): JsonResponse
+    public function destroy(Product $product): RedirectResponse
     {
         $product->delete();
 
-        return response()->json(status: 204);
+        return redirect()
+            ->route('admin.products.index')
+            ->with('status', 'Product deleted.');
     }
 
     /**
