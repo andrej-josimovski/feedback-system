@@ -7,9 +7,11 @@ use App\Http\Requests\StoreReportRequest;
 use App\Jobs\AnalyzeFeedbackJob;
 use App\Models\Product;
 use App\Models\Report;
+use App\Models\ReportSection;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Throwable;
 
 class ReportController extends Controller
 {
@@ -63,35 +65,51 @@ class ReportController extends Controller
         $report->ai_model = $data['model'] ?? $report->ai_model ?? config('services.openrouter.model');
         $report->save();
 
-        AnalyzeFeedbackJob::dispatch($report->id, [
-            'model' => $report->ai_model,
-            'batch_size' => $data['batch_size'] ?? 25,
-        ]);
-
-        return redirect()
-            ->route('admin.reports.show', $report)
-            ->with('status', 'AI analysis queued.');
-    }
-
-    public function publish(Report $report): RedirectResponse
-    {
-        if ($report->status !== 'pending_review') {
-            $report->status = 'pending_review';
-            $report->save();
-
+        try {
+            AnalyzeFeedbackJob::dispatchSync($report->id, [
+                'model' => $report->ai_model,
+                'batch_size' => $data['batch_size'] ?? 25,
+            ]);
+        } catch (Throwable $e) {
             return redirect()
                 ->route('admin.reports.show', $report)
-                ->with('status', 'Report moved to review.');
+                ->with('status', 'AI summary generation failed.');
         }
-
-        $report->update([
-            'status' => 'published',
-            'published_at' => now(),
-            'published_by' => request()->user()?->id,
-        ]);
 
         return redirect()
             ->route('admin.reports.show', $report)
-            ->with('status', 'Report published.');
+            ->with('status', 'AI summary generated.');
+    }
+
+    public function publish(Request $request, Report $report)
+    {
+        $report->update([
+            'status'       => 'published',
+            'published_at' => now(),
+            'published_by' => $request->user()->id,
+        ]);
+
+        return redirect()->back()->with('status', 'Report published.');
+    }
+
+    public function updateSection(Request $request, Report $report, ReportSection $section): RedirectResponse
+    {
+        $validated = $request->validate([
+            'theme'         => 'required|string|max:255',
+            'ai_summary'    => 'nullable|string',
+            'admin_summary' => 'nullable|string',
+            'issues'        => 'nullable|string',
+            'proposals'     => 'nullable|string',
+        ]);
+
+        $section->update([
+            'theme'         => $validated['theme'],
+            'ai_summary'    => $validated['ai_summary'],
+            'admin_summary' => $validated['admin_summary'],
+            'issues'        => $validated['issues'] ? array_map('trim', explode("\n", $validated['issues'])) : [],
+            'proposals'     => $validated['proposals'] ? array_map('trim', explode("\n", $validated['proposals'])) : [],
+        ]);
+
+        return redirect()->route('admin.reports.show', $report)->with('status', 'Section updated.');
     }
 }

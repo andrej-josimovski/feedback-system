@@ -68,26 +68,14 @@ class ReportController extends Controller
         return response()->json($report);
     }
 
-    public function publish(Request $request, Report $report): JsonResponse
+    public function publish(Request $request, Report $report)
     {
-        $this->authorize('publish', $report);
-
-        if ($report->status !== 'pending_review') {
-            return response()->json([
-                'message' => 'Only reports in pending_review status can be published.',
-                'current_status' => $report->status,
-            ], 422);
-        }
-
         $report->update([
-            'status' => 'published',
+            'status'       => 'published',
             'published_at' => now(),
             'published_by' => $request->user()->id,
         ]);
 
-        return response()->json([
-            'message' => 'Report published successfully.',
-            'report' => $report,
-        ]);
+        return redirect()->back()->with('status', 'Report published.');
     }
 }

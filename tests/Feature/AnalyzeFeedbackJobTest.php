@@ -92,6 +92,75 @@ class AnalyzeFeedbackJobTest extends TestCase
         });
     }
 
+    public function test_admin_generate_ai_summary_runs_analysis_immediately(): void
+    {
+        [$productId, $userId] = $this->createProductAndUser();
+
+        $admin = User::factory()->create([
+            'team_id' => DB::table('users')->find($userId)->team_id,
+            'role' => 'admin',
+        ]);
+
+        $report = Report::create([
+            'product_id' => $productId,
+            'user_id' => $admin->id,
+            'title' => 'Immediate Summary',
+            'period_from' => '2026-06-01',
+            'period_to' => '2026-06-30',
+        ]);
+
+        Feedback::create([
+            'product_id' => $productId,
+            'user_id' => $userId,
+            'rating' => 4,
+            'comment' => 'The dashboard is much easier to read now.',
+            'created_at' => '2026-06-05 10:00:00',
+            'updated_at' => '2026-06-05 10:00:00',
+        ]);
+
+        Http::fake([
+            '*' => Http::response([
+                'choices' => [
+                    [
+                        'message' => [
+                            'content' => json_encode([
+                                'clusters' => [
+                                    [
+                                        'cluster_id' => 'dashboard',
+                                        'theme' => 'Dashboard readability',
+                                        'members' => [],
+                                        'ai_summary' => 'Customers say the dashboard is easier to read after the update.',
+                                        'issues' => [],
+                                        'proposals' => ['Keep the current dashboard structure'],
+                                        'combined_text' => 'The dashboard is much easier to read now.',
+                                    ],
+                                ],
+                            ]),
+                        ],
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        $response = $this
+            ->actingAs($admin)
+            ->post(route('admin.reports.analyze', $report));
+
+        $response
+            ->assertRedirect(route('admin.reports.show', $report))
+            ->assertSessionHas('status', 'AI summary generated.');
+
+        $report->refresh();
+
+        $this->assertSame('completed', $report->ai_status);
+        $this->assertStringContainsString('average rating of 4/5', $report->ai_analysis['summary_message']);
+        $this->assertDatabaseHas('report_sections', [
+            'report_id' => $report->id,
+            'theme' => 'Dashboard readability',
+            'ai_summary' => 'Customers say the dashboard is easier to read after the update.',
+        ]);
+    }
+
     /**
      * @return array{int, int}
      */

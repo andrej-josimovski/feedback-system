@@ -40,7 +40,7 @@
                     <form method="POST" action="{{ route('admin.reports.publish', $report) }}">
                         @csrf
                         @method('PATCH')
-                        <x-secondary-button>{{ $report->status === 'pending_review' ? __('Publish') : __('Move to review') }}</x-secondary-button>
+                        <x-secondary-button type="submit">{{ __('Publish') }}</x-secondary-button>
                     </form>
                 </div>
 
@@ -71,14 +71,60 @@
                 <div class="mt-4 space-y-4">
                     @forelse ($report->sections->sortBy('order') as $section)
                         <article class="rounded-md border border-gray-200 p-4">
-                            <h4 class="font-semibold text-gray-900">{{ $section->theme }}</h4>
-                            <p class="mt-2 text-sm leading-6 text-gray-700">{{ $section->ai_summary }}</p>
-                            @if ($section->issues)
-                                <div class="mt-3 text-sm text-gray-700"><span class="font-medium">Issues:</span> {{ implode(', ', $section->issues) }}</div>
-                            @endif
-                            @if ($section->proposals)
-                                <div class="mt-2 text-sm text-gray-700"><span class="font-medium">Proposals:</span> {{ implode(', ', $section->proposals) }}</div>
-                            @endif
+                            <div x-data="{ editing: false }">
+                                <div class="flex items-center justify-between">
+                                    <h4 class="font-semibold text-gray-900">{{ $section->theme }}</h4>
+                                    <x-secondary-button type="button" @click="editing = !editing">{{ __('Edit') }}</x-secondary-button>
+                                </div>
+
+                                {{-- View mode --}}
+                                <div x-show="!editing">
+                                    <p class="mt-2 text-sm leading-6 text-gray-700">{{ $section->ai_summary }}</p>
+                                    @if ($section->admin_summary)
+                                        <div class="mt-2 text-sm text-gray-700"><span class="font-medium">Admin summary:</span> {{ $section->admin_summary }}</div>
+                                    @endif
+                                    @if ($section->issues)
+                                        <div class="mt-3 text-sm text-gray-700"><span class="font-medium">Issues:</span> {{ implode(', ', $section->issues) }}</div>
+                                    @endif
+                                    @if ($section->proposals)
+                                        <div class="mt-2 text-sm text-gray-700"><span class="font-medium">Proposals:</span> {{ implode(', ', $section->proposals) }}</div>
+                                    @endif
+                                </div>
+
+                                {{-- Edit mode --}}
+                                <div x-show="editing" class="mt-4">
+                                    <form method="POST" action="{{ route('admin.reports.sections.update', [$report, $section]) }}">
+                                        @csrf
+                                        @method('PATCH')
+                                        <div class="space-y-3">
+                                            <div>
+                                                <label class="text-xs font-medium text-gray-500">Theme</label>
+                                                <input type="text" name="theme" value="{{ $section->theme }}" class="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm">
+                                            </div>
+                                            <div>
+                                                <label class="text-xs font-medium text-gray-500">AI Summary</label>
+                                                <textarea name="ai_summary" rows="3" class="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm">{{ $section->ai_summary }}</textarea>
+                                            </div>
+                                            <div>
+                                                <label class="text-xs font-medium text-gray-500">Admin Summary</label>
+                                                <textarea name="admin_summary" rows="3" class="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm">{{ $section->admin_summary }}</textarea>
+                                            </div>
+                                            <div>
+                                                <label class="text-xs font-medium text-gray-500">Issues (one per line)</label>
+                                                <textarea name="issues" rows="3" class="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm">{{ implode("\n", $section->issues ?? []) }}</textarea>
+                                            </div>
+                                            <div>
+                                                <label class="text-xs font-medium text-gray-500">Proposals (one per line)</label>
+                                                <textarea name="proposals" rows="3" class="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm">{{ implode("\n", $section->proposals ?? []) }}</textarea>
+                                            </div>
+                                            <div class="flex gap-2">
+                                                <x-primary-button type="submit">Save</x-primary-button>
+                                                <x-secondary-button type="button" @click="editing = false">Cancel</x-secondary-button>
+                                            </div>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
                         </article>
                     @empty
                         <div class="text-sm text-gray-500">No sections generated yet.</div>

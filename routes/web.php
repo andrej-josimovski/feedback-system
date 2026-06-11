@@ -38,6 +38,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/reports/{report}', [AdminReportController::class, 'show'])->name('reports.show');
     Route::post('/reports/{report}/analyze', [AdminReportController::class, 'analyze'])->name('reports.analyze');
     Route::patch('/reports/{report}/publish', [AdminReportController::class, 'publish'])->name('reports.publish');
+    Route::patch('/reports/{report}/sections/{section}', [AdminReportController::class, 'updateSection'])->name('reports.sections.update');
 });
 
 require __DIR__.'/auth.php';

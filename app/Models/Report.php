@@ -29,7 +29,6 @@ class Report extends Model
             'period_from' => 'date',
             'period_to' => 'date',
             'published_at' => 'datetime',
-            // AI analysis fields
             'ai_analysis' => 'array',
             'ai_started_at' => 'datetime',
             'ai_completed_at' => 'datetime',
